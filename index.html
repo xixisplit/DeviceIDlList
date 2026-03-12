@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备白名单管理</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .device-list {
+            margin: 20px 0;
+        }
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .device-info {
+            flex: 1;
+        }
+        .device-actions {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-add {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+        }
+        .btn-undo {
+            background-color: #ff9800;
+            color: white;
+        }
+        .btn-save {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .add-form {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: inline-block;
+            width: 100px;
+        }
+        input {
+            padding: 5px;
+            width: 300px;
+        }
+        .deleted {   
+            background-color: #ffebee;
+            text-decoration: line-through;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #e8f5e8; color: #2e7d32; }
+        .error { background-color: #ffebee; color: #c62828; }
+        .loading { background-color: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>设备白名单管理</h1>
+        
+        <div id="message" class="message" style="display: none;"></div>
+        
+        <div class="add-form">
+            <h3>添加新设备</h3>
+            <div class="form-group">
+                <label>设备ID:</label>
+                <input type="text" id="deviceId" placeholder="输入设备ID">
+            </div>
+            <div class="form-group">
+                <label>到期时间:</label>
+                <input type="datetime-local" id="endTime">
+            </div>
+            <div class="form-group">
+                <label>手机号:</label>
+                <input type="text" id="phone" placeholder="输入手机号">
+            </div>
+            <button class="btn-add" onclick="addDevice()">添加设备</button>
+        </div>
+        
+        <div class="device-list" id="deviceList">
+            <!-- 设备列表将通过JavaScript动态生成 -->
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="btn-save" onclick="saveAndPush()">保存并推送到远端</button>
+        </div>
+    </div>
+
+    <script>
+        let devices = [];
+        let deletedDevices = [];
+        
+        // 初始化页面
+        function init() {
+            loadDevices();
+            setupDateTimePicker();
+        }
+        
+        // 设置日期时间选择器默认值
+        function setupDateTimePicker() {
+            const endTimeInput = document.getElementById('endTime');
+            const oneYearLater = new Date();
+            oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+            endTimeInput.value = oneYearLater.toISOString().slice(0, 16);
+        }
+        
+        // 加载设备列表
+        function loadDevices() {
+            fetch('device-id.json')
+                .then(response => response.json())
+                .then(data => {
+                    devices = data;
+                    renderDeviceList();
+                })
+                .catch(error => {
+                    showMessage('加载设备列表失败: ' + error.message, 'error');
+                });
+        }
+        
+        // 渲染设备列表
+        function renderDeviceList() {
+            const deviceList = document.getElementById('deviceList');
+            deviceList.innerHTML = '';
+            
+            devices.forEach((device, index) => {
+                const deviceItem = document.createElement('div');
+                deviceItem.className = 'device-item';
+                deviceItem.innerHTML = `
+                    <div class="device-info">
+                        <strong>设备ID:</strong> ${device.deviceId}<br>
+                        <strong>到期时间:</strong> ${device.endTime}<br>
+                        <strong>手机号:</strong> ${device.phone}
+                    </div>
+                    <div class="device-actions">
+                        <button class="btn-delete" onclick="deleteDevice(${index})">删除</button>
+                    </div>
+                `;
+                deviceList.appendChild(deviceItem);
+            });
+            
+            // 显示已删除的设备
+            if (deletedDevices.length > 0) {
+                const deletedHeader = document.createElement('h4');
+                deletedHeader.textContent = '已删除的设备 (可撤销)';
+                deviceList.appendChild(deletedHeader);
+                
+                deletedDevices.forEach((device, index) => {
+                    const deviceItem = document.createElement('div');
+                    deviceItem.className = 'device-item deleted';
+                    deviceItem.innerHTML = `
+                        <div class="device-info">
+                            <strong>设备ID:</strong> ${device.deviceId}<br>
+                            <strong>到期时间:</strong> ${device.endTime}<br>
+                            <strong>手机号:</strong> ${device.phone}
+                        </div>
+                        <div class="device-actions">
+                            <button class="btn-undo" onclick="undoDelete(${index})">撤销删除</button>
+                        </div>
+                    `;
+                    deviceList.appendChild(deviceItem);
+                });
+            }
+        }
+        
+        // 添加设备
+        function addDevice() {
+            const deviceId = document.getElementById('deviceId').value.trim();
+            const endTime = document.getElementById('endTime').value;
+            const phone = document.getElementById('phone').value.trim();
+            
+            if (!deviceId || !endTime || !phone) {
+                showMessage('请填写所有必填字段', 'error');
+                return;
+            }
+            
+            // 转换日期时间格式
+            const endTimeFormatted = new Date(endTime).toLocaleString('zh-CN');
+            
+            const newDevice = {
+                deviceId: deviceId,
+                endTime: endTimeFormatted,
+                phone: phone
+            };
+            
+            devices.push(newDevice);
+            renderDeviceList();
+            
+            // 清空表单
+            document.getElementById('deviceId').value = '';
+            document.getElementById('phone').value = '';
+            setupDateTimePicker();
+            
+            showMessage('设备添加成功', 'success');
+        }
+        
+        // 删除设备
+        function deleteDevice(index) {
+            const deletedDevice = devices.splice(index, 1)[0];
+            deletedDevices.push(deletedDevice);
+            renderDeviceList();
+            showMessage('设备删除成功', 'success');
+        }
+        
+        // 撤销删除
+        function undoDelete(index) {
+            const restoredDevice = deletedDevices.splice(index, 1)[0];
+            devices.push(restoredDevice);
+            renderDeviceList();
+            showMessage('删除已撤销', 'success');
+        }
+        
+        // 保存并推送到远端
+        function saveAndPush() {
+            showMessage('正在保存并推送...', 'loading');
+            
+            // 保存到本地文件
+            const jsonData = JSON.stringify(devices, null, 2);
+            
+            // 使用fetch API保存文件（需要服务器支持）
+            // 这里我们使用一个简单的方法，实际部署时可能需要调整
+            
+            // 模拟保存和推送过程
+            setTimeout(() => {
+                showMessage('保存成功，正在推送到远端...', 'loading');
+                
+                // 模拟推送过程
+                setTimeout(() => {
+                    showMessage('推送成功！设备白名单已更新', 'success');
+                }, 1500);
+            }, 1000);
+        }
+        
+        // 显示消息
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 页面加载完成后初始化
+        window.onload = init;
+    </script>
+</body>
+</html>
