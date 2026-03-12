@@ -1,8 +1,7 @@
-{
-  "device_id": "device-001",
-  "name": "Device ID Manager",
-  "version": "1.0.0",
-  "description": "Device ID management system",
-  "created_at": "2026-03-13",
-  "devices": []
+[
+  {
+    "deviceId": "DEV20260313001",
+ "endTime": "2027-03-13 23:59:59",
+"phone":"123456789"
 }
+]
