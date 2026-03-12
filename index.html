@@ -126,7 +126,8 @@
         </div>
         
         <div style="text-align: center; margin-top: 20px;">
-            <button class="btn-save" onclick="saveAndPush()">保存并推送到远端</button>
+            <button class="btn-save" onclick="saveToFile()">保存到本地</button>
+            <button class="btn-save" onclick="saveAndPush()" style="margin-left: 10px;">保存并推送到远端</button>
         </div>
     </div>
 
@@ -150,14 +151,31 @@
         
         // 加载设备列表
         function loadDevices() {
+            showMessage('正在加载设备列表...', 'loading');
+            
+            // 尝试加载本地JSON文件
             fetch('device-id.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('HTTP error ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    devices = data;
+                    // 验证数据格式
+                    if (Array.isArray(data)) {
+                        devices = data;
+                        showMessage('设备列表加载成功，共 ' + data.length + ' 个设备', 'success');
+                    } else {
+                        throw new Error('JSON格式错误：不是数组');
+                    }
                     renderDeviceList();
                 })
                 .catch(error => {
                     showMessage('加载设备列表失败: ' + error.message, 'error');
+                    // 使用默认数据作为备用
+                    devices = [];
+                    renderDeviceList();
                 });
         }
         
@@ -260,18 +278,41 @@
             // 保存到本地文件
             const jsonData = JSON.stringify(devices, null, 2);
             
-            // 使用fetch API保存文件（需要服务器支持）
-            // 这里我们使用一个简单的方法，实际部署时可能需要调整
+            // 1. 下载更新后的JSON文件
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'device-id.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             
-            // 模拟保存和推送过程
+            // 2. 提示用户
             setTimeout(() => {
-                showMessage('保存成功，正在推送到远端...', 'loading');
+                showMessage('JSON文件已下载，请替换原文件后手动推送', 'success');
                 
-                // 模拟推送过程
+                // 3. 显示git命令提示
                 setTimeout(() => {
-                    showMessage('推送成功！设备白名单已更新', 'success');
-                }, 1500);
+                    showMessage('推送命令: git add device-id.json && git commit -m "update device list" && git push', 'loading');
+                }, 2000);
             }, 1000);
+        }
+        
+        // 保存到本地文件（新功能）
+        function saveToFile() {
+            const jsonData = JSON.stringify(devices, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'device-id.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showMessage('JSON文件已保存到本地', 'success');
         }
         
         // 显示消息
