@@ -153,15 +153,22 @@
         function loadDevices() {
             showMessage('正在加载设备列表...', 'loading');
             
+            // 显示当前URL和路径信息
+            const currentUrl = window.location.href;
+            const jsonUrl = new URL('device-id.json', currentUrl).href;
+            showMessage('尝试加载: ' + jsonUrl, 'loading');
+            
             // 尝试加载本地JSON文件
-            fetch('device-id.json')
+            fetch(jsonUrl)
                 .then(response => {
+                    showMessage('HTTP状态: ' + response.status + ' ' + response.statusText, 'loading');
                     if (!response.ok) {
-                        throw new Error('HTTP error ' + response.status);
+                        throw new Error('HTTP error ' + response.status + ' ' + response.statusText);
                     }
                     return response.json();
                 })
                 .then(data => {
+                    showMessage('JSON数据加载成功，长度: ' + data.length, 'success');
                     // 验证数据格式
                     if (Array.isArray(data)) {
                         devices = data;
@@ -173,6 +180,7 @@
                 })
                 .catch(error => {
                     showMessage('加载设备列表失败: ' + error.message, 'error');
+                    showMessage('当前URL: ' + currentUrl, 'error');
                     // 使用默认数据作为备用
                     devices = [];
                     renderDeviceList();
